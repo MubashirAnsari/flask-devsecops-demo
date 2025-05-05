@@ -9,7 +9,7 @@ pipeline {
         stage('Run Flask App') {
             steps {
                 withCredentials([string(credentialsId: 'flask-demo-secret', variable: 'DEMO_SECRET')]) {
-                    // Stop and remove any existing container running the flask-demo image
+                    // Stop and remove any existing container using the flask-demo image
                     sh '''
                       CONTAINER_ID=$(docker ps -q --filter "ancestor=flask-demo")
                       if [ ! -z "$CONTAINER_ID" ]; then
@@ -21,6 +21,16 @@ pipeline {
                       fi
                     '''
                     
+                    // Free the port if it's in use by a different process
+                    sh '''
+                      if lsof -i :7549; then
+                        echo "Port 7549 is in use, killing the process"
+                        lsof -i :7549 -t | xargs kill -9
+                      else
+                        echo "Port 7549 is free"
+                      fi
+                    '''
+
                     // Run the new container
                     sh "docker run -d -e DEMO_SECRET=\${DEMO_SECRET} -p 7549:7549 flask-demo:${BUILD_NUMBER}"
                 }
