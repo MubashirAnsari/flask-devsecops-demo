@@ -1,22 +1,47 @@
 pipeline {
     agent any
+    environment {
+        FLASK_PORT = "7549"
+    }
     stages {
-        stage('Build Docker Image') {
+        stage('Clean Existing Docker State') {
             steps {
-                // Build Docker image with a unique tag using the build number
-                sh "docker build -t flask-demo:${BUILD_NUMBER} ."
+                sh '''
+                    echo "Checking for container using port ${FLASK_PORT}..."
+                    USED_CONTAINER=$(docker ps --filter "publish=${FLASK_PORT}" -q)
+                    if [ ! -z "$USED_CONTAINER" ]; then
+                      echo "Stopping container on port ${FLASK_PORT}..."
+                      docker stop $USED_CONTAINER
+                      docker rm $USED_CONTAINER
+                    else
+                      echo "No container using port ${FLASK_PORT}"
+                    fi
+
+                    echo "Cleaning up old flask-demo containers..."
+                    docker ps -a --filter "ancestor=flask-demo" -q | xargs -r docker rm -f
+
+                    echo "Removing flask-demo image cache (if exists)..."
+                    docker images -q flask-demo | xargs -r docker rmi -f || true
+                '''
             }
         }
-        stage('Run Flask App') {
+
+        stage('Build Docker Image (No Cache)') {
             steps {
-                // Securely inject the DEMO_SECRET and run the container
+                sh "docker build --no-cache -t flask-demo:${BUILD_NUMBER} ."
+            }
+        }
+
+        stage('Run Flask App on Port 7549') {
+            steps {
                 withCredentials([string(credentialsId: 'flask-demo-secret', variable: 'DEMO_SECRET')]) {
-                    // Stop any existing containers created from the flask-demo image
                     sh '''
-                      docker ps -q --filter "ancestor=flask-demo" | grep . && docker stop $(docker ps -q --filter "ancestor=flask-demo") || echo "No container to stop"
+                        echo "Running new flask-demo container..."
+                        docker run -d --rm \
+                          -e DEMO_SECRET=${DEMO_SECRET} \
+                          -p ${FLASK_PORT}:${FLASK_PORT} \
+                          flask-demo:${BUILD_NUMBER}
                     '''
-                    // Run the new container with the secret as an environment variable
-                    sh "docker run -d -e DEMO_SECRET=\${DEMO_SECRET} -p 7549:7549 flask-demo:${BUILD_NUMBER}"
                 }
             }
         }
