@@ -1,7 +1,7 @@
 pipeline {
     agent any
     environment {
-        DEMO_SECRET = credentials('demo-secret-id')
+        DEMO_SECRET = credentials('flask-demo-secret')
     }
     stages {
         stage('Build Docker Image') {
