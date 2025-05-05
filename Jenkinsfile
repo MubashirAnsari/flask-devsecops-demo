@@ -20,8 +20,8 @@ pipeline {
                         echo "No container to stop"
                       fi
                     '''
-                    
-                    // Free the port if it's in use by a different process
+
+                    // Check if the port 7549 is in use and free it up
                     sh '''
                       if lsof -i :7549; then
                         echo "Port 7549 is in use, killing the process"
@@ -31,8 +31,9 @@ pipeline {
                       fi
                     '''
 
-                    // Run the new container
+                    // Run the container with port 7549
                     sh "docker run -d -e DEMO_SECRET=\${DEMO_SECRET} -p 7549:7549 flask-demo:${BUILD_NUMBER}"
+                    echo "Flask app is running on port 7549"
                 }
             }
         }
