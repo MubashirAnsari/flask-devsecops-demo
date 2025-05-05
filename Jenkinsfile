@@ -3,37 +3,20 @@ pipeline {
     stages {
         stage('Build Docker Image') {
             steps {
+                // Build Docker image with a unique tag using the build number
                 sh "docker build -t flask-demo:${BUILD_NUMBER} ."
             }
         }
         stage('Run Flask App') {
             steps {
+                // Securely inject the DEMO_SECRET and run the container
                 withCredentials([string(credentialsId: 'flask-demo-secret', variable: 'DEMO_SECRET')]) {
-                    // Stop and remove any existing container using the flask-demo image
+                    // Stop any existing containers created from the flask-demo image
                     sh '''
-                      CONTAINER_ID=$(docker ps -q --filter "ancestor=flask-demo")
-                      if [ ! -z "$CONTAINER_ID" ]; then
-                        echo "Stopping existing container with ID $CONTAINER_ID"
-                        docker stop $CONTAINER_ID
-                        docker rm $CONTAINER_ID
-                      else
-                        echo "No container to stop"
-                      fi
+                      docker ps -q --filter "ancestor=flask-demo" | grep . && docker stop $(docker ps -q --filter "ancestor=flask-demo") || echo "No container to stop"
                     '''
-
-                    // Check if the port 7549 is in use and free it up
-                    sh '''
-                      if lsof -i :7549; then
-                        echo "Port 7549 is in use, killing the process"
-                        lsof -i :7549 -t | xargs kill -9
-                      else
-                        echo "Port 7549 is free"
-                      fi
-                    '''
-
-                    // Run the container with port 7549
+                    // Run the new container with the secret as an environment variable
                     sh "docker run -d -e DEMO_SECRET=\${DEMO_SECRET} -p 7549:7549 flask-demo:${BUILD_NUMBER}"
-                    echo "Flask app is running on port 7549"
                 }
             }
         }
