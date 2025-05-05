@@ -1,8 +1,5 @@
 pipeline {
     agent any
-    environment {
-        // DEMO_SECRET is securely fetched using the credentials plugin
-    }
     stages {
         stage('Build Docker Image') {
             steps {
